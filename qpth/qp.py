@@ -85,7 +85,7 @@ def QPFunction(eps=1e-12, verbose=0, notImprovedLim=3,
                     except:
                         raise RuntimeError('Q is not SPD.')
 
-            _, nineq, nz = G.size()
+            _, nineq, nz = G.shape[0], G.shape[1], G.shape[2]
             neq = A.size(1) if A.nelement() > 0 else 0
             assert(neq > 0 or nineq > 0)
             ctx.neq, ctx.nineq, ctx.nz = neq, nineq, nz

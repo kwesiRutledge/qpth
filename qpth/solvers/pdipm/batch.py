@@ -6,7 +6,7 @@ from qpth.util import get_sizes, bdiag
 
 
 def lu_hack(x):
-    data, pivots = x.lu(pivot=not x.is_cuda)
+    data, pivots = torch.linalg.lu_factor(x, pivot=not x.is_cuda)
     if x.is_cuda:
         if x.ndimension() == 2:
             pivots = torch.arange(1, 1+x.size(0)).int().cuda()
@@ -349,14 +349,19 @@ def solve_kkt(Q_LU, d, G, A, S_LU, rx, rs, rz, ry):
     """ Solve KKT equations for the affine step"""
     nineq, nz, neq, nBatch = get_sizes(G, A)
 
-    invQ_rx = rx.unsqueeze(2).lu_solve(*Q_LU).squeeze(2)
+    # invQ_rx = rx.unsqueeze(2).lu_solve(*Q_LU).squeeze(2)
+    invQ_rx = torch.linalg.lu_solve(
+        *Q_LU, rx.unsqueeze(2),
+    ).squeeze(2)
     if neq > 0:
         h = torch.cat((invQ_rx.unsqueeze(1).bmm(A.transpose(1, 2)).squeeze(1) - ry,
                        invQ_rx.unsqueeze(1).bmm(G.transpose(1, 2)).squeeze(1) + rs / d - rz), 1)
     else:
         h = invQ_rx.unsqueeze(1).bmm(G.transpose(1, 2)).squeeze(1) + rs / d - rz
 
-    w = -(h.unsqueeze(2).lu_solve(*S_LU)).squeeze(2)
+    w = - torch.linalg.lu_solve(
+        *S_LU, h.unsqueeze(2),
+    ).squeeze(2)
 
     g1 = -rx - w[:, neq:].unsqueeze(1).bmm(G).squeeze(1)
     if neq > 0:
@@ -392,7 +397,11 @@ a non-zero diagonal.
     # See the 'Block LU factorization' part of our website
     # for more details.
 
-    G_invQ_GT = torch.bmm(G, G.transpose(1, 2).lu_solve(*Q_LU))
+    #G_invQ_GT = torch.bmm(G, G.transpose(1, 2).lu_solve(*Q_LU))
+    G_invQ_GT = torch.bmm(
+        G, 
+        torch.linalg.lu_solve(*Q_LU,G.transpose(1, 2)),
+    )
     R = G_invQ_GT.clone()
     S_LU_pivots = torch.IntTensor(range(1, 1 + neq + nineq)).unsqueeze(0) \
         .repeat(nBatch, 1).type_as(Q).int()
